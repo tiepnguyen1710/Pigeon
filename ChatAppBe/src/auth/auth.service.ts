@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Response } from 'express';
@@ -78,6 +78,88 @@ export class AuthService {
           id: newUser.id,
           username: newUser.username,
         }
+      }
+
+      /**
+       * Logout - Clear refresh token from database and cookie
+       */
+      async logout(user: IUser, res: Response) {
+        await this.usersService.clearRefreshToken(user.id);
+        
+        res.clearCookie('refresh_token');
+        
+        return {
+          message: 'Logout successfully',
+        };
+      }
+
+      /**
+       * Refresh Token - Get new access token using refresh token
+       */
+      async refreshToken(refreshToken: string, res: Response) {
+        if (!refreshToken) {
+          throw new BadRequestException('Refresh token is required');
+        }
+
+        try {
+          // Verify refresh token
+          const payload = this.jwtService.verify(refreshToken, {
+            secret: this.configService.get<string>('SECRET_KEY_REFRESH'),
+          });
+
+          // Find user and check if refresh token matches
+          const user = await this.usersService.findOneById(payload.id);
+          if (!user || user.refreshToken !== refreshToken) {
+            throw new UnauthorizedException('Invalid refresh token');
+          }
+
+          // Create new tokens
+          const newPayload = {
+            sub: 'token login',
+            iss: 'from server',
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            role: user.role,
+          };
+
+          const new_refresh_token = this.createRefreshToken(newPayload);
+          await this.usersService.assignRefreshToken(new_refresh_token, user.id);
+
+          res.cookie('refresh_token', new_refresh_token, {
+            httpOnly: true,
+            maxAge: 24 * 60 * 60 * 1000, // 1 day in milliseconds
+          });
+
+          const access_token = this.jwtService.sign(newPayload);
+
+          return {
+            access_token,
+            refresh_token: new_refresh_token,
+            user: {
+              id: user.id,
+              username: user.username,
+              email: user.email,
+              role: user.role,
+            }
+          };
+        } catch (error) {
+          throw new UnauthorizedException('Invalid or expired refresh token');
+        }
+      }
+
+      /**
+       * Get Profile - Get current user profile from JWT
+       */
+      async getProfile(user: IUser) {
+        const fullUser = await this.usersService.findOneById(user.id);
+        
+        if (!fullUser) {
+          throw new UnauthorizedException('User not found');
+        }
+
+        const { password, refreshToken, ...result } = fullUser;
+        return result;
       }
 }
 
