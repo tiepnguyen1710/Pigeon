@@ -15,7 +15,7 @@ datasource db {
 
 // User model for Chat Application
 model User {
-  id           String   @id @default(uuid())
+  id           BigInt   @id @default(autoincrement())
   email        String   @unique
   username     String   @unique
   password     String
@@ -24,9 +24,42 @@ model User {
   age          Int?
   gender       String?
   refreshToken String?
-  isOnline     Boolean  @default(false)
+  lastSeen     DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  groups      GroupMember[]
+  ownedGroups Group[] @relation("ownedGroups")
+
   @@map("users")
 }
+
+model Group {
+  id        BigInt       @id @default(autoincrement())
+  name      String?
+  avatarUrl String?
+  ownerId   BigInt
+  owner     User         @relation("ownedGroups",fields: [ownerId], references: [id])
+  createdAt DateTime     @default(now())
+
+  members   GroupMember[]
+
+  @@map("groups")
+}
+
+model GroupMember {
+  groupId  BigInt
+  userId   BigInt
+  role     String   @default("member")
+  joinedAt DateTime @default(now())
+  leftAt   DateTime?
+
+  group    Group    @relation(fields: [groupId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
+
+  @@id([groupId, userId])
+
+  @@map("group_members")
+}
+
+
