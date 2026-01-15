@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Response } from 'express';
 import { RegisterUserDto } from '../users/dto/create-user.dto';
-import { IUser } from '../users/users.interface';
+import { IUser, serializeUserId, deserializeUserId } from '../users/users.interface';
 import { UsersService } from '../users/users.service';
 
 
@@ -29,11 +29,14 @@ export class AuthService {
 
     async login(user: IUser, res: Response) {
         const {id, username, email, role} = user;
+        
+        // Convert BigInt to string for JWT (BigInt cannot be serialized to JSON)
+        const idString = typeof id === 'bigint' ? serializeUserId(id) : id;
 
         const payload = {
             sub: 'token login',
             iss: 'from server',
-            id,
+            id: idString,
             username,
             email, 
             role
@@ -41,7 +44,7 @@ export class AuthService {
 
         let refresh_token = this.createRefreshToken(payload);
 
-        await this.usersService.assignRefreshToken(refresh_token, id);
+        await this.usersService.assignRefreshToken(refresh_token, typeof id === 'bigint' ? id : deserializeUserId(id));
 
         res.cookie('refresh_token', refresh_token, {
             httpOnly: true,
@@ -53,7 +56,7 @@ export class AuthService {
           access_token,
           refresh_token,
           user: {
-            id,
+            id: idString,
             username,
             email,
             role,
@@ -75,7 +78,7 @@ export class AuthService {
         const newUser = await this.usersService.register(user);
 
         return {
-          id: newUser.id,
+          id: serializeUserId(newUser.id),
           username: newUser.username,
         }
       }
@@ -84,7 +87,8 @@ export class AuthService {
        * Logout - Clear refresh token from database and cookie
        */
       async logout(user: IUser, res: Response) {
-        await this.usersService.clearRefreshToken(user.id);
+        const userId = typeof user.id === 'bigint' ? user.id : deserializeUserId(user.id);
+        await this.usersService.clearRefreshToken(userId);
         
         res.clearCookie('refresh_token');
         
@@ -108,16 +112,17 @@ export class AuthService {
           });
 
           // Find user and check if refresh token matches
-          const user = await this.usersService.findOneById(payload.id);
+          const user = await this.usersService.findOneById(deserializeUserId(payload.id));
           if (!user || user.refreshToken !== refreshToken) {
             throw new UnauthorizedException('Invalid refresh token');
           }
 
           // Create new tokens
+          const idString = serializeUserId(user.id);
           const newPayload = {
             sub: 'token login',
             iss: 'from server',
-            id: user.id,
+            id: idString,
             username: user.username,
             email: user.email,
             role: user.role,
@@ -137,7 +142,7 @@ export class AuthService {
             access_token,
             refresh_token: new_refresh_token,
             user: {
-              id: user.id,
+              id: idString,
               username: user.username,
               email: user.email,
               role: user.role,
@@ -152,14 +157,19 @@ export class AuthService {
        * Get Profile - Get current user profile from JWT
        */
       async getProfile(user: IUser) {
-        const fullUser = await this.usersService.findOneById(user.id);
+        const userId = typeof user.id === 'bigint' ? user.id : deserializeUserId(user.id);
+        const fullUser = await this.usersService.findOneById(userId);
         
         if (!fullUser) {
           throw new UnauthorizedException('User not found');
         }
 
         const { password, refreshToken, ...result } = fullUser;
-        return result;
+        
+        // Convert BigInt id to string for JSON response
+        return {
+          ...result,
+          id: serializeUserId(result.id),
+        };
       }
 }
-

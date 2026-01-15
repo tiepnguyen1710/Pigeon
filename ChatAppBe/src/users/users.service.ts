@@ -18,11 +18,11 @@ export class UsersService {
   }
 
   /**
-   * Find user by ID
+   * Find user by ID (BigInt)
    */
-  async findOneById(id: string): Promise<User | null> {
+  async findOneById(id: bigint | number): Promise<User | null> {
     return this.prisma.user.findUnique({
-      where: { id },
+      where: { id: BigInt(id) },
     });
   }
 
@@ -53,9 +53,9 @@ export class UsersService {
   /**
    * Assign refresh token to user
    */
-  async assignRefreshToken(refreshToken: string, userId: string): Promise<void> {
+  async assignRefreshToken(refreshToken: string, userId: bigint | number): Promise<void> {
     await this.prisma.user.update({
-      where: { id: userId },
+      where: { id: BigInt(userId) },
       data: { refreshToken },
     });
   }
@@ -99,20 +99,29 @@ export class UsersService {
   /**
    * Clear refresh token (for logout)
    */
-  async clearRefreshToken(userId: string): Promise<void> {
+  async clearRefreshToken(userId: bigint | number): Promise<void> {
     await this.prisma.user.update({
-      where: { id: userId },
+      where: { id: BigInt(userId) },
       data: { refreshToken: null },
     });
   }
 
   /**
-   * Update user online status
+   * Update user last seen timestamp (replaces isOnline)
    */
-  async updateOnlineStatus(userId: string, isOnline: boolean): Promise<void> {
+  async updateLastSeen(userId: bigint | number): Promise<void> {
     await this.prisma.user.update({
-      where: { id: userId },
-      data: { isOnline },
+      where: { id: BigInt(userId) },
+      data: { lastSeen: new Date() },
     });
+  }
+
+  /**
+   * Check if user is online (last seen within 5 minutes)
+   */
+  isUserOnline(user: User): boolean {
+    if (!user.lastSeen) return false;
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    return user.lastSeen > fiveMinutesAgo;
   }
 }
