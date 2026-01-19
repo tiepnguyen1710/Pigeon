@@ -7,7 +7,6 @@ import { deserializeUserId } from '../users/users.interface';
 import type { IUser } from '../users/users.interface';
 
 @Controller('groups')
-@UseGuards(AuthGuard('jwt'))
 export class GroupsController {
     constructor(private groupsService: GroupsService) {}
 

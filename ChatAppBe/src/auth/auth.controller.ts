@@ -3,6 +3,7 @@ import { AuthGuard } from '@nestjs/passport';
 import type { Response, Request } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterUserDto } from '../users/dto/create-user.dto';
+import { Public } from 'src/decorators/customize';
 
 @Controller('auth')
 export class AuthController {
@@ -13,6 +14,7 @@ export class AuthController {
    * Login with email and password
    * Uses LocalStrategy for validation
    */
+  @Public()
   @UseGuards(AuthGuard('local'))
   @Post('login')
   async login(
@@ -26,6 +28,7 @@ export class AuthController {
    * POST /auth/register
    * Register new user
    */
+  @Public()
   @Post('register')
   async register(@Body() registerDto: RegisterUserDto) {
     return this.authService.register(registerDto);
@@ -36,7 +39,7 @@ export class AuthController {
    * Logout and clear refresh token
    * Requires JWT authentication
    */
-  @UseGuards(AuthGuard('jwt'))
+
   @Post('logout')
   async logout(
     @Req() req: Request,
