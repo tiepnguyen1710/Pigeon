@@ -1,5 +1,5 @@
 export interface IUser {
-  id: bigint | string; // BigInt from DB, string from JWT
+  id: bigint; // BigInt from DB, string from JWT
   username: string;
   email: string;
   role: string;
