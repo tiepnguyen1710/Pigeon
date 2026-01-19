@@ -116,4 +116,25 @@ export class GroupsService {
 
         return groups.map(serializeBigInts);
     }
+
+
+    async groupExists(groupId: bigint | number | string): Promise<boolean> {
+        const group = await this.prisma.group.findUnique({
+            where: { id: BigInt(groupId) },
+            select: { id: true },
+        });
+        return !!group;
+    }
+
+    async isMember(groupId: bigint | number | string, userId: bigint | number | string): Promise<boolean> {
+        const member = await this.prisma.groupMember.findFirst({
+            where: {
+                groupId: BigInt(groupId),
+                userId: BigInt(userId),
+                leftAt: null,
+            },
+            select: { groupId: true },
+        });
+        return !!member;
+    }
 }
